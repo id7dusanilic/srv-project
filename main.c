@@ -21,100 +21,235 @@
 
 /* Macro definitions */
 
-#define BIT_SET(reg, bit)               reg |=  (bit)
-#define BIT_CLEAR(reg, bit)             reg &= ~(bit)
-#define BIT_TOGGLE(reg, bit)            reg ^=  (bit)
+/** @brief Macro for setting bits specified by the mask */
+#define BIT_SET(reg, mask)              reg |=  (mask)
+/** @brief Macro for clearing bits specified by the mask */
+#define BIT_CLEAR(reg, mask)            reg &= ~(mask)
+/** @brief Macro for toggling bits specified by the mask */
+#define BIT_TOGGLE(reg, mask)           reg ^=  (mask)
 
+/** @brief Macro for making an artificial delay using a loop */
 #define ARTIFICIAL_DELAY(i, count)      for( i = 0; i < count; i++ )
 
+/** @brief Maximum unsigned integer mask */
 #define ULONG_MAX                       ( 0xffffffff )
 
-/**
- * @brief UCBRx for 9600 baud rate with 32,768Hz clock
- */
+/** @brief UCBRx for 9600 baud rate with 32,768Hz clock */
 #define BR9600_UCBR                     ( 3 )
 
-/**
- * @brief UCBRSx for 9600 baud rate with 32,768Hz clock
- */
+/** @brief UCBRSx for 9600 baud rate with 32,768Hz clock */
 #define BR9600_UCBRS                    ( UCBRS_3 )
 
-
+/** @brief xTask1 priority */
 #define mainTASK1_PRIORITY              ( 2 )
+/** @brief xTask2 priority */
 #define mainTASK2_PRIORITY              ( 4 )
+/** @brief xTask3 priority */
 #define mainTASK3_PRIORITY              ( 3 )
+/** @brief xTask3 priority */
 #define mainTASK4_PRIORITY              ( 3 )
+/** @brief UART Task priority */
 #define mainUART_TASK_PRIORITY          ( 1 )
 
+/** @brief ADC12 Sampling rate in milliseconds
+ *
+ * Used as a software timer period.
+ */
 #define mainADC_SAMPLING_RATE_MS        ( 500 )
+
+/** @brief Queue length for the queue storing ADC Conversion results */
 #define mainADC_DATA_QUEUE_LENGTH       ( 10 )
-
+/** @brief Queue length for the queue storing data to be transmitted via UART */
 #define mainUART_DATA_QUEUE_LENGTH      ( 10 )
-
+/** @brief Queue length for the queue storing the selected channel */
 #define mainCHANNEL_SELECT_QUEUE_LENGTH ( 10 )
-
+/** @brief Queue length for the queue storing bridge information */
 #define mainTASK1_BRIDGE_QUEUE_LENGTH   ( 10 )
 
+/** @brief Notification value for events on S3 */
 #define mainS3_NOTIFICATION_VALUE       ( 3 )
+/** @brief Notification value for events on S4 */
 #define mainS4_NOTIFICATION_VALUE       ( 4 )
 
+/** @brief Number of last samples used for calculating the mean value */
 #define mainNUM_OF_SAMPLES              ( 8 )
 
 /* Data type definitions */
 
+/** @brief Enum data type for identifying about storing information ADC Channels */
 typedef enum {
     eADC_CHANNEL_0,
     eADC_CHANNEL_1
 } adc_channel_t;
 
+/**
+ * @brief Enum data type for identifying event types
+ *
+ * Event can be either an end of ADC conversion or
+ * a button pressed event.
+ */
 typedef enum {
     eADC_EVENT,
     eBUTTON_EVENT
 } bridge_data_t;
 
+/** @brief Stores information about ADC conversion value and the channel converted */
 typedef struct {
     adc_channel_t   xChannel;
     uint8_t         ucData;
 } adc_data_t;
 
+/** @brief Stores information about ADC conversion value and the channel converted */
 typedef struct {
     adc_channel_t   xChannel;
     uint8_t         ucData;
 } uart_data_t;
 
 /* Handle declarations */
+
+/** @brief xTask1 Task Handle */
 TaskHandle_t  xTask1Handle;
+/** @brief xTask2 Task Handle */
 TaskHandle_t  xTask2Handle;
+/** @brief xTask3 Task Handle */
 TaskHandle_t  xTask4Handle;
+/** @brief xTask4 Task Handle */
 TaskHandle_t  xTask3Handle;
+/** @brief UART Task Handle */
 TaskHandle_t  xUARTTaskHandle;
 
+/** @brief ADC Sampling Timer Handle */
 TimerHandle_t xADCSamplingTimer;
 
+/**
+ * @brief ADC Data Queue Handle
+ *
+ * Holds adc_data_t structures from last conversions
+ */
 QueueHandle_t xADCDataQueue;
+
+/**
+ * @brief UART Data Queue Handle
+ *
+ * Holds uart_data_t structures ready for sending via UART
+ */
 QueueHandle_t xUARTDataQueue;
+
+/**
+ * @brief Channel Select Queue Handle
+ *
+ * Holds last channel selected for reading
+ */
 QueueHandle_t xChannelSelectQueue;
+
+/**
+ * @brief xTask1 Bridge Queue Handle
+ *
+ * Holds bridge_data_t structures to signal which queues
+ * are ready for reading by xTask1.
+ */
 QueueHandle_t xTask1BridgeQueue;
 
 /* Function declarations */
+
+/**
+ * @brief Initializes required peripherals
+ *
+ * Peripherals initialized are ADC, USCI_A1 (UART) and ports (buttons).
+ */
 static inline void prvInitPeripherals( void );
+
+/**
+ * @brief Initializes ADC12
+ *
+ * Initializes ADC12 in single sequence of channels mode.
+ * Conversion is started with a software start, and a single
+ * start converts all selected channels.
+ * Selected channels are 0 and 1.
+ * End of conversion interrupts are enabled.
+ * Channel 0 converted value is stored in ADC12MEM0.
+ * Channel 1 converted value is stored in ADC12MEM1.
+ * Pins P6.0 and P6.1 are configured for use with ADC.
+ */
 static inline void prvInitADC( void );
+
+/**
+ * @brief Initializes USCI_A1 in 9600 8N1 UART Mode
+ *
+ * Clock source is ACLK (32,768Hz).
+ * 9600 8N1 UART Mode is selected.
+ * Pins P4.4 (Tx) and P4.5 (Rx) are configured for use with UART.
+ * Interrupts are disabled.
+ */
 static inline void prvInitUART( void );
+
+/**
+ * @brief Initializes pins for use with buttons S3 and S4.
+ *
+ * Pins P1.4 (button S3) and P1.5 (button S4) are configured
+ * as inputs with falling edge interrupts enabled, and pull-up
+ * resistors enabled.
+ */
 static inline void prvInitButtons( void );
 
+/** @brief xTask1 Task Function
+ *
+ *
+ */
 static void prvTask1Function( void *pvParameters );
+
+/** @brief xTask2 Task Function
+ *
+ *
+ */
 static void prvTask2Function( void *pvParameters );
+
+/** @brief
+ *
+ *
+ */
 static void prvPrepareDataTaskFunction( void *pvParameters );
+
+/** @brief UART Task Function
+ *
+ *
+ */
 static void prvUARTTaskFunction( void *pvParameters );
 
+/**
+ * @brief Convert an integer to a string in decimal representation
+ *
+ * @param num Number to be converted to a string.
+ * @param str Buffer where the result is written.
+ */
 static void prvDecimalToString( unsigned int num, char * str );
-static void prvTransmitStringViaUART( char * str );
+
+/**
+ * @brief Transmits a string via UART
+ *
+ * @param str String to be sent via UART.
+ */
+static void prvTransmitStringViaUART( const char * str );
+
+/**
+ * @brief Calculates the mean value of the given array
+ *
+ * @param array Array whose mean value is calculated
+ * @param length Length of array
+ */
 static inline uint8_t prvArrayMean( uint8_t * array, uint8_t length );
 
+/**
+ * @brief Timer Callback Function
+ *
+ * Starts the ADC Conversion each time the timer expires
+ */
 void prvTimerCallbackFunction( TimerHandle_t xTimer );
 
 /**
  * @brief Main function
+ *
+ * Creates necessary tasks and queues, creates and starts the timer, and starts the scheduler.
  */
 void main( void )
 {
@@ -426,15 +561,13 @@ uint32_t    ulNotificationValue;
     }
 }
 
-static void prvTransmitStringViaUART( char * str )
+static void prvTransmitStringViaUART( const char * str )
 {
-char * tmp = str;
-
-    while( *tmp )
+    while( *str )
     {
         while(!(UCA1IFG & UCTXIFG));
-        UCA1TXBUF = *tmp;
-        tmp++;
+        UCA1TXBUF = *str;
+        str++;
     }
 }
 
@@ -487,6 +620,12 @@ void prvTimerCallbackFunction( TimerHandle_t xTimer )
     BIT_TOGGLE(P1OUT, BIT0);
 }
 
+/**
+ * @brief ADC12 Interrupt Service Routine
+ *
+ * Each time a conversion finishes, packages the conversion result and
+ * the channel converted and sends the information to the ADC Data Queue.
+ */
 void __attribute__ ( ( interrupt( ADC12_VECTOR  ) ) ) ADC12_ISR( void )
 {
 BaseType_t          xHigherPriorityTaskWoken_1 = pdFALSE;
@@ -524,6 +663,12 @@ const bridge_data_t xBridgeData = eADC_EVENT;
     portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
 }
 
+/**
+ * @brief PORT1 Interrupt Service Routine
+ *
+ * Whenever a falling edge occurs on one of the buttons S3 (P1.4) or S4 (P1.5),
+ * notifies the xTask2 about it.
+ */
 void __attribute__ ( ( interrupt( PORT1_VECTOR  ) ) ) PORT1_ISR( void )
 {
 BaseType_t xHigherPriorityTaskWoken = pdFALSE;
