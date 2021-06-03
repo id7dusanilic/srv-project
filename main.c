@@ -1,6 +1,12 @@
 /**
  * @file    main.c
- * @brief
+ * @brief   Samples ADC12 Channels 0 and 1 and calculates mean value.
+ *
+ * Samples ADC12 Channels 0 and 1 with 500ms sampling rate.
+ * When a button is pressed, mean value of the last 8 samples of
+ * the selected channel is transmitted via UART.
+ *
+ * Button S3 selects Channel 0 and button S4 selects Channel 1.
  *
  * @author  Dusan Ilic
  * @date    2021
@@ -8,7 +14,6 @@
 
 /* Standard includes. */
 #include <ETF5529_HAL/hal_ETF_5529.h>
-#include <stdio.h>
 
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
