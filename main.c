@@ -199,25 +199,37 @@ static inline void prvInitButtons( void );
 
 /** @brief xTask1 Task Function
  *
+ * Depending on the event that happened (ADC Conversion or Button press)
+ * performs an action.
  *
+ * If ADC Conversion ended, stores the value in the array that holds last
+ * mainNUM_OF_SAMPLES samples for the corresponding channel.
+ *
+ * If button was pressed, calculates the mean of the samples from the samples
+ * array and sends the information to one of tasks xTask3 or xTask4 depending
+ * on the button pressed.
  */
 static void prvTask1Function( void *pvParameters );
 
-/** @brief xTask2 Task Function
+/**
+ * @brief xTask2 Task Function
  *
- *
+ * Detects button presses and notifies xTask1 about it.
  */
 static void prvTask2Function( void *pvParameters );
 
-/** @brief
+/** @brief Function for implementation of xTask3 and xTask4.
  *
+ * Packages the mean samples value, and information about the channel and
+ * sends it to the UART Task true a queue.
  *
+ * The channel information is passed through pvParameters when creatin the task
  */
 static void prvPrepareDataTaskFunction( void *pvParameters );
 
 /** @brief UART Task Function
  *
- *
+ * Reads data from a queue, forms a string from it, and sends it via UART.
  */
 static void prvUARTTaskFunction( void *pvParameters );
 
@@ -227,14 +239,14 @@ static void prvUARTTaskFunction( void *pvParameters );
  * @param num Number to be converted to a string.
  * @param str Buffer where the result is written.
  */
-static void prvDecimalToString( unsigned int num, char * str );
+static void prvDecimalToString( unsigned int num, char *str );
 
 /**
  * @brief Transmits a string via UART
  *
  * @param str String to be sent via UART.
  */
-static void prvTransmitStringViaUART( const char * str );
+static void prvTransmitStringViaUART( const char *str );
 
 /**
  * @brief Calculates the mean value of the given array
@@ -242,7 +254,7 @@ static void prvTransmitStringViaUART( const char * str );
  * @param array Array whose mean value is calculated
  * @param length Length of array
  */
-static inline uint8_t prvArrayMean( uint8_t * array, uint8_t length );
+static inline uint8_t prvArrayMean( uint8_t *array, uint8_t length );
 
 /**
  * @brief Timer Callback Function
@@ -566,7 +578,7 @@ uint32_t    ulNotificationValue;
     }
 }
 
-static void prvTransmitStringViaUART( const char * str )
+static void prvTransmitStringViaUART( const char *str )
 {
     while( *str )
     {
@@ -576,7 +588,7 @@ static void prvTransmitStringViaUART( const char * str )
     }
 }
 
-static void prvDecimalToString( unsigned int num, char * str )
+static void prvDecimalToString( unsigned int num, char *str )
 {
     int i = 0;
     int len = 0;
@@ -605,7 +617,7 @@ static void prvDecimalToString( unsigned int num, char * str )
     str[len] = '\0';
 }
 
-static inline uint8_t prvArrayMean( uint8_t * array, uint8_t length )
+static inline uint8_t prvArrayMean( uint8_t *array, uint8_t length )
 {
 uint8_t  i;
 uint32_t sum = 0;
