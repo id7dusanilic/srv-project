@@ -51,7 +51,7 @@
 #define mainTASK2_PRIORITY              ( 4 )
 /** @brief xTask3 priority */
 #define mainTASK3_PRIORITY              ( 3 )
-/** @brief xTask3 priority */
+/** @brief xTask4 priority */
 #define mainTASK4_PRIORITY              ( 3 )
 /** @brief UART Task priority */
 #define mainUART_TASK_PRIORITY          ( 1 )
@@ -81,7 +81,7 @@
 
 /* Data type definitions */
 
-/** @brief Enum data type for identifying about storing information ADC Channels */
+/** @brief Enum data type for identifying ADC Channels */
 typedef enum {
     eADC_CHANNEL_0,
     eADC_CHANNEL_1
@@ -150,7 +150,7 @@ QueueHandle_t xChannelSelectQueue;
 /**
  * @brief xTask1 Bridge Queue Handle
  *
- * Holds bridge_data_t structures to signal which queues
+ * Holds bridge_data_t to signal which queues
  * are ready for reading by xTask1.
  */
 QueueHandle_t xTask1BridgeQueue;
@@ -223,7 +223,7 @@ static void prvTask2Function( void *pvParameters );
  * Packages the mean samples value, and information about the channel and
  * sends it to the UART Task true a queue.
  *
- * The channel information is passed through pvParameters when creatin the task
+ * The channel information is passed through pvParameters when creating the task
  */
 static void prvPrepareDataTaskFunction( void *pvParameters );
 
@@ -480,14 +480,14 @@ uint8_t       ucChannel1Mean = 0;
             switch( xADCData.xChannel )
             {
             case eADC_CHANNEL_0:
-                ucChannel0Samples[ucCh0Pos] = xADCData.ucData;
-                // ucCh0Pos = ( ucCh0Pos + 1 ) % mainNUM_OF_SAMPLES;
-                ucCh0Pos = ( ucCh0Pos + 1 ) & 0x07;
+                ucChannel0Samples[ucCh0Pos++] = xADCData.ucData;
+                /* if( ucCh0Pos == mainNUM_OF_SAMPLES ) ucCh0Pos = 0; */
+                ucCh0Pos &= 0x07; /* More efficient when mainNUM_OF_SAMPLES == 8 */
             break;
             case eADC_CHANNEL_1:
-                ucChannel1Samples[ucCh1Pos] = xADCData.ucData;
-                // ucCh1Pos = ( ucCh1Pos + 1 ) % mainNUM_OF_SAMPLES;
-                ucCh1Pos = ( ucCh1Pos + 1 ) & 0x07;
+                ucChannel1Samples[ucCh1Pos++] = xADCData.ucData;
+                /* if( ucCh1Pos == mainNUM_OF_SAMPLES ) ucCh1Pos = 0; */
+                ucCh1Pos &= 0x07; /* More efficient when mainNUM_OF_SAMPLES == 8 */
             break;
             default: break;
             }
@@ -527,11 +527,11 @@ const bridge_data_t xBridgeData = eBUTTON_EVENT;
         xTaskNotifyWait(ULONG_MAX, ULONG_MAX, &ulNotificationValue, portMAX_DELAY);
         /* Delay and read the button state - "Debounce" */
         ARTIFICIAL_DELAY(i, 3000);
-        /* Depending on the notification value read a button state */
+        /* Depending on the notification value read the button state */
         switch( ulNotificationValue )
         {
         case mainS3_NOTIFICATION_VALUE:
-            /* Enable interrupts */
+            /* Re-enable interrupts */
             BIT_SET(P1IE, BIT4);
             if ( ( P1IN & BIT4 ) == 0 )
             {
@@ -543,7 +543,7 @@ const bridge_data_t xBridgeData = eBUTTON_EVENT;
             }
         break;
         case mainS4_NOTIFICATION_VALUE:
-            /* Enable interrupts */
+            /* Re-enable interrupts */
             BIT_SET(P1IE, BIT5);
             if ( ( P1IN & BIT5 ) == 0 )
             {
@@ -591,9 +591,9 @@ static void prvTransmitStringViaUART( const char *str )
 static void prvDecimalToString( unsigned int num, char *str )
 {
     int i = 0;
-    int len = 0;
 
     int j;
+    int len;
     int digit;
     char tmp;
 
