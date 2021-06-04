@@ -474,8 +474,8 @@ uint8_t       ucChannel1Mean = 0;
         {
         case eADC_EVENT:
             /* Read the sample values from the ADC data queue
-             * and calculate the mean value for last 8 samples
-             * for each channel */
+             * and store them in array. Only last mainNUM_OF_SAMPLES
+             * are kept in the array. */
             xQueueReceive(xADCDataQueue, &xADCData, 0);
             switch( xADCData.xChannel )
             {
