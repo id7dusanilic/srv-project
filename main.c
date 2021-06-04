@@ -46,7 +46,7 @@
 #define BR9600_UCBRS                    ( UCBRS_3 )
 
 /** @brief xTask1 priority */
-#define mainTASK1_PRIORITY              ( 2 )
+#define mainTASK1_PRIORITY              ( 1 )
 /** @brief xTask2 priority */
 #define mainTASK2_PRIORITY              ( 4 )
 /** @brief xTask3 priority */
@@ -54,7 +54,7 @@
 /** @brief xTask4 priority */
 #define mainTASK4_PRIORITY              ( 3 )
 /** @brief UART Task priority */
-#define mainUART_TASK_PRIORITY          ( 1 )
+#define mainUART_TASK_PRIORITY          ( 2 )
 
 /** @brief ADC12 Sampling rate in milliseconds
  *
@@ -68,9 +68,6 @@
 #define mainUART_DATA_QUEUE_LENGTH      ( 10 )
 /** @brief Queue length for the queue storing the selected channel */
 #define mainCHANNEL_SELECT_QUEUE_LENGTH ( 10 )
-/** @brief Queue length for the queue storing bridge information */
-#define mainTASK1_BRIDGE_QUEUE_LENGTH   ( 10 )
-
 /** @brief Notification value for events on S3 */
 #define mainS3_NOTIFICATION_VALUE       ( 3 )
 /** @brief Notification value for events on S4 */
@@ -86,17 +83,6 @@ typedef enum {
     eADC_CHANNEL_0,
     eADC_CHANNEL_1
 } adc_channel_t;
-
-/**
- * @brief Enum data type for identifying event types
- *
- * Event can be either an end of ADC conversion or
- * a button pressed event.
- */
-typedef enum {
-    eADC_EVENT,
-    eBUTTON_EVENT
-} bridge_data_t;
 
 /** @brief Stores information about ADC conversion value and the channel converted */
 typedef struct {
@@ -146,14 +132,6 @@ QueueHandle_t xUARTDataQueue;
  * Holds last channel selected for reading
  */
 QueueHandle_t xChannelSelectQueue;
-
-/**
- * @brief xTask1 Bridge Queue Handle
- *
- * Holds bridge_data_t to signal which queues
- * are ready for reading by xTask1.
- */
-QueueHandle_t xTask1BridgeQueue;
 
 /* Function declarations */
 
@@ -313,7 +291,6 @@ void main( void )
 
     /* Create queues */
     xChannelSelectQueue = xQueueCreate(mainCHANNEL_SELECT_QUEUE_LENGTH, sizeof(adc_channel_t));
-    xTask1BridgeQueue   = xQueueCreate(mainTASK1_BRIDGE_QUEUE_LENGTH,   sizeof(bridge_data_t));
     xUARTDataQueue      = xQueueCreate(mainUART_DATA_QUEUE_LENGTH,      sizeof(uart_data_t));
     xADCDataQueue       = xQueueCreate(mainADC_DATA_QUEUE_LENGTH,       sizeof(adc_data_t));
 
@@ -455,7 +432,6 @@ char        cNumHolder[4];
 
 static void prvTask1Function( void *pvParameters )
 {
-bridge_data_t xBridgeData;
 adc_channel_t xADCChannel;
 adc_data_t    xADCData;
 uint8_t       ucCh0Pos = 0;
@@ -467,16 +443,13 @@ uint8_t       ucChannel1Mean = 0;
 
     for( ;; )
     {
-        /* Wait for an event - ADC Conversion or Button press */
-        xQueueReceive(xTask1BridgeQueue, &xBridgeData, portMAX_DELAY);
+        /* Process any queue that is ready */
 
-        switch( xBridgeData )
+        /* Read the sample values from the ADC data queue
+         * and store them in array. Only last mainNUM_OF_SAMPLES
+         * are kept in the array. */
+        while( xQueueReceive(xADCDataQueue, &xADCData, 0) == pdTRUE )
         {
-        case eADC_EVENT:
-            /* Read the sample values from the ADC data queue
-             * and calculate the mean value for last 8 samples
-             * for each channel */
-            xQueueReceive(xADCDataQueue, &xADCData, 0);
             switch( xADCData.xChannel )
             {
             case eADC_CHANNEL_0:
@@ -491,11 +464,11 @@ uint8_t       ucChannel1Mean = 0;
             break;
             default: break;
             }
-        break;
-        case eBUTTON_EVENT:
-            /* Read from the channel select queue
-             * and send the mean value to the right task */
-            xQueueReceive(xChannelSelectQueue, &xADCChannel, 0);
+        }
+
+        /* Read from the channel select queue and send the mean value to the right task */
+        while ( xQueueReceive(xChannelSelectQueue, &xADCChannel, 0) == pdTRUE )
+        {
             switch( xADCChannel )
             {
             case eADC_CHANNEL_0:
@@ -508,18 +481,15 @@ uint8_t       ucChannel1Mean = 0;
             break;
             default: break;
             }
-        break;
-        default: break;
         }
     }
 }
 
 static void prvTask2Function( void *pvParameters )
 {
-uint16_t            i;
-uint32_t            ulNotificationValue;
-adc_channel_t       xADCChannel;
-const bridge_data_t xBridgeData = eBUTTON_EVENT;
+uint16_t      i;
+uint32_t      ulNotificationValue;
+adc_channel_t xADCChannel;
 
     for( ;; )
     {
@@ -538,8 +508,6 @@ const bridge_data_t xBridgeData = eBUTTON_EVENT;
                 /* Fill the channel select queue */
                 xADCChannel = eADC_CHANNEL_0;
                 xQueueSendToBack(xChannelSelectQueue, &xADCChannel, portMAX_DELAY);
-                /* Fill the xTask1 bridge queue */
-                xQueueSendToBack(xTask1BridgeQueue, &xBridgeData, portMAX_DELAY);
             }
         break;
         case mainS4_NOTIFICATION_VALUE:
@@ -550,8 +518,6 @@ const bridge_data_t xBridgeData = eBUTTON_EVENT;
                 /* Fill the channel select queue */
                 xADCChannel = eADC_CHANNEL_1;
                 xQueueSendToBack(xChannelSelectQueue, &xADCChannel, portMAX_DELAY);
-                /* Fill the xTask1 bridge queue */
-                xQueueSendToBack(xTask1BridgeQueue, &xBridgeData, portMAX_DELAY);
             }
         break;
         default: break;
@@ -645,12 +611,8 @@ void prvTimerCallbackFunction( TimerHandle_t xTimer )
  */
 void __attribute__ ( ( interrupt( ADC12_VECTOR  ) ) ) ADC12_ISR( void )
 {
-BaseType_t          xHigherPriorityTaskWoken_1 = pdFALSE;
-BaseType_t          xHigherPriorityTaskWoken_2 = pdFALSE;
-BaseType_t          xHigherPriorityTaskWoken   = pdFALSE;
-adc_data_t          xConversionResult;
-const bridge_data_t xBridgeData = eADC_EVENT;
-
+BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+adc_data_t xConversionResult;
 
     switch( ADC12IV )
     {
@@ -658,25 +620,18 @@ const bridge_data_t xBridgeData = eADC_EVENT;
         /* Package data from channel 0 and send to queue */
         xConversionResult.xChannel = eADC_CHANNEL_0;
         xConversionResult.ucData   = (ADC12MEM0 >> 4) & 0xff;
-        xQueueSendToBackFromISR(xADCDataQueue, &xConversionResult, &xHigherPriorityTaskWoken_1);
-        /* Fill the xTask1 bridge queue */
-        xQueueSendToBackFromISR(xTask1BridgeQueue, &xBridgeData, &xHigherPriorityTaskWoken_2);
+        xQueueSendToBackFromISR(xADCDataQueue, &xConversionResult, &xHigherPriorityTaskWoken);
     break;
     case ADC12IV_ADC12IFG1:
         /* Package data from channel 1 and send to queue */
         xConversionResult.xChannel = eADC_CHANNEL_1;
         xConversionResult.ucData   = (ADC12MEM1 >> 4) & 0xff;
-        xQueueSendToBackFromISR(xADCDataQueue, &xConversionResult, &xHigherPriorityTaskWoken_1);
-        /* Fill the xTask1 bridge queue */
-        xQueueSendToBackFromISR(xTask1BridgeQueue, &xBridgeData, &xHigherPriorityTaskWoken_2);
+        xQueueSendToBackFromISR(xADCDataQueue, &xConversionResult, &xHigherPriorityTaskWoken);
     break;
     default: break;
     }
 
-    if ( xHigherPriorityTaskWoken_1 || xHigherPriorityTaskWoken_2 )
-        xHigherPriorityTaskWoken = pdTRUE;
-
-    /* trigger scheduler if higher priority task is woken */
+    /* Trigger scheduler if higher priority task is woken */
     portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
 }
 
@@ -711,5 +666,6 @@ BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     default: break;
     }
 
+    /* Trigger scheduler if higher priority task is woken */
     portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
 }
