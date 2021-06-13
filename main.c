@@ -192,14 +192,14 @@ static void prvTask1Function( void *pvParameters );
 /**
  * @brief xTask2 Task Function
  *
- * Detects button presses and notifies xTask1 about it.
+ * Detects button presses and sends button information to a queue.
  */
 static void prvTask2Function( void *pvParameters );
 
 /** @brief Function for implementation of xTask3 and xTask4.
  *
  * Packages the mean samples value, and information about the channel and
- * sends it to the UART Task true a queue.
+ * sends it to the UART Task via a queue.
  *
  * The channel information is passed through pvParameters when creating the task
  */
@@ -313,7 +313,7 @@ void main( void )
     /* If all is well then this line will never be reached.  If it is reached
     then it is likely that there was insufficient (FreeRTOS) heap memory space
     to create the idle task.  This may have been trapped by the malloc() failed
-    hook function, if one is configured. */	
+    hook function, if one is configured. */
     for( ;; );
 }
 
